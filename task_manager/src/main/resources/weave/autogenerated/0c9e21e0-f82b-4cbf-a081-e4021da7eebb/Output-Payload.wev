@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_0c9e21e0_f82b_4cbf_a081_e4021da7eebb_Output_Payload = Array<{  description: String,   task_id?: String,   priority: String,   createdOn: String,   _?: Any}>
+

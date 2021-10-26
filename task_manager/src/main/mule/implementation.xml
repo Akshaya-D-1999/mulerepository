@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="getall" doc:id="0c9e21e0-f82b-4cbf-a081-e4021da7eebb" >
+		<db:select doc:name="Select" doc:id="a0e0dcaa-9b68-4f47-b254-d6e1013c0214" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from task_list]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="ed645980-1b46-4c61-9bfd-7c3276631350" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	task_id: payload01.task_id,
+	description: payload01.task_desc default "",
+	priority: payload01.task_priority default "",
+	createdOn: payload01.task_created as String{format: "dd/MM/YYYY"} default ""
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="get_by_ID" doc:id="1bf5ce27-dc58-4a81-b585-345a4ebd5050" >
+		<db:query-single doc:name="Query single" doc:id="79ff04d2-bbd2-4fff-b818-036754d5e662" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from task_list where task_ID = :x]]></db:sql>
+			<db:input-parameters ><![CDATA[#['x' : vars.task_ID]]]></db:input-parameters>
+		</db:query-single>
+		<ee:transform doc:name="Transform Message" doc:id="071a95f5-27bd-46a4-b4a3-71341c8f2b54" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+	task_id: payload.task_id,
+	description: payload.task_desc default "",
+	priority: payload.task_priority default "",
+	createdOn: payload.task_created default ""
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="delete_by_ID" doc:id="3aafebd1-c2be-4a02-a884-6544de1b64cc" >
+		<db:delete doc:name="Delete" doc:id="c2483a1f-cf1d-4e66-9cbd-15c9133cd9f0" config-ref="Database_Config">
+			<db:sql ><![CDATA[delete from task_list where task_ID = :y]]></db:sql>
+			<db:input-parameters ><![CDATA[#['y' : vars.task_ID]]]></db:input-parameters>
+		</db:delete>
+		<ee:transform doc:name="Transform Message" doc:id="c985615c-3ef6-42db-a8e0-c029545e190c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "successfully deleted"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<sub-flow name="variable_sub_flow" doc:id="1070cff7-8c8c-4aef-b465-881a974aaf24" >
+		<set-variable value="#[message.payload.description]" doc:name="Description" doc:id="22e079f0-2486-4103-bd55-0a45c218ba91" variableName="description"/>
+		<set-variable value="#[message.payload.priority]" doc:name="Priority" doc:id="29014248-47b7-4105-b39b-685aa0b89562" variableName="priority"/>
+		<set-variable value="#[message.payload.createdOn]" doc:name="Createdon" doc:id="30b9e720-925e-4831-8f33-42dc004978ac" variableName="createdOn"/>
+	</sub-flow>
+	<flow name="putbyID" doc:id="e24a9b37-0ab7-48cb-9512-03af02f9593b" >
+		<flow-ref doc:name="Flow Reference" doc:id="4fbeb149-1f6c-4d2f-86ec-9fd3302b907b" name="variable_sub_flow"/>
+		<db:query-single doc:name="Query single" doc:id="b0f75a44-8476-42c8-b79e-82fc821d2bd7" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from task_list where task_id = :x]]></db:sql>
+			<db:input-parameters ><![CDATA[#['x' : vars.task_id]]]></db:input-parameters>
+		</db:query-single>
+		<choice doc:name="Choice" doc:id="6ab08445-0ae6-49fa-bc3e-f40eb7625006" >
+			<when expression="#[sizeOf(payload)&gt;0]">
+				<db:update doc:name="Update" doc:id="2d1f101d-9d1a-4df9-a088-653590c699b1" config-ref="Database_Config">
+					<db:sql ><![CDATA[update task_list set task_desc = :description, task_priority = :priority, task_created = :createdOn where task_id = :task_id]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	'description' : vars.description,
+	'priority' : vars.priority,
+	'createdOn' : vars.createdOn,
+	'task_id' : vars.task_id
+}]]]></db:input-parameters>
+				</db:update>
+				<ee:transform doc:name="Transform Message" doc:id="42b1fe81-7079-457b-b652-e0cf9cc2b16f" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "data is replaced successfully"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<db:insert doc:name="Insert" doc:id="7aba881b-2a45-4ce4-9d40-1f814e034945" config-ref="Database_Config">
+					<db:sql ><![CDATA[insert into task_list(task_id,task_desc,task_priority,task_created) values (:id,:a,:b,:c)]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	id : vars.task_id,
+	a : vars.description,
+	b : vars.priority,
+	c : vars.createdOn
+}]]]></db:input-parameters>
+				</db:insert>
+				<ee:transform doc:name="Transform Message" doc:id="ad13434a-b61f-4d7e-824f-872ce4b3a273" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "inserted successfully"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="post" doc:id="d2af07fe-1f9c-4424-859b-fe36d28d9086" >
+		<flow-ref doc:name="Flow Reference" doc:id="331d4c62-4dcf-4d97-a0dc-070f1a86a9ec" name="variable_sub_flow"/>
+		<db:query-single doc:name="Query single" doc:id="32557b7e-9d0c-4221-bf2a-9c52fae17855" config-ref="Database_Config">
+			<db:sql ><![CDATA[select max(task_id) from task_list]]></db:sql>
+		</db:query-single>
+		<set-variable value='#["T" ++((payload."max(task_id)"[1 to 3] as Number)+1)]' doc:name="Set Variable" doc:id="0722faf8-6243-4f2d-9f40-ca415a965d97" variableName="task_id"/>
+		<ee:transform doc:name="Transform Message" doc:id="84259ff0-b2a1-4796-998e-54acc45d3a1d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	date : vars.createdOn as Date{format: "dd/MMM/yyyy"} as Date
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:insert doc:name="Insert" doc:id="822cf9b0-a662-495e-9924-1f22b56053f1" config-ref="Database_Config">
+			<db:sql ><![CDATA[insert into task_list(task_id,task_desc,task_priority,task_created) values (:id,:a,:b,:c)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	id : vars.task_id,
+	a : vars.description,
+	b : vars.priority,
+	c : payload.date
+}]]]></db:input-parameters>
+		</db:insert>
+		<ee:transform doc:name="Transform Message" doc:id="05e3914f-f2da-46dc-834b-4d2b4f7e61e0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message : "inserted successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="patchFlow" doc:id="50fa00de-3eb9-4621-b1cc-b8368bb4dd58" >
+		<flow-ref doc:name="Flow Reference" doc:id="46a2e254-64b2-4543-91b7-498a1193b19e" name="variable_sub_flow"/>
+		<db:update doc:name="Update" doc:id="0f049f11-fd71-4503-805c-cb5bafc07199" config-ref="Database_Config">
+			<db:sql ><![CDATA[update task_list set task_desc = :a, task_priority = :b where task_id = :i]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	a : vars.description,
+	b : vars.priority,
+	i : vars.task_id
+}]]]></db:input-parameters>
+		</db:update>
+		<ee:transform doc:name="Transform Message" doc:id="6d861059-4786-4f94-ac88-e90df3cfa4da" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Message : "Modified successfully"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
